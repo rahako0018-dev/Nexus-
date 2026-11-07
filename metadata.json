@@ -1,0 +1,6 @@
+{
+  "name": "Nexus",
+  "description": "Nexus Game Sidebar - Advanced gaming overlay, Facebook & Messenger quick access, real-time performance dashboard, and background stability engine for Android.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
