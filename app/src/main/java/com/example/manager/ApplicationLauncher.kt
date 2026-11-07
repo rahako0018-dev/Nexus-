@@ -4,6 +4,7 @@ import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
@@ -33,25 +34,29 @@ data class SocialAppStatus(
 class ApplicationLauncher(private val context: Context) {
     private val packageManager: PackageManager = context.packageManager
 
-    // Target packages for Facebook, Messenger, and Instagram
-    private val fbPackages = listOf("com.facebook.katana", "com.facebook.lite")
+    // Prioritize Facebook Lite
+    private val fbLitePackages = listOf("com.facebook.lite", "com.facebook.katana")
     private val msgPackages = listOf("com.facebook.orca", "com.facebook.mlite")
     private val instaPackages = listOf("com.instagram.android", "com.instagram.lite")
 
-    fun getFacebookStatus(): SocialAppStatus {
-        for (pkg in fbPackages) {
-            val status = checkPackage(pkg, "Facebook", "https://m.facebook.com")
-            if (status.isInstalled) return status
+    fun getFbLiteStatus(): SocialAppStatus {
+        for (pkg in fbLitePackages) {
+            val isLite = pkg == "com.facebook.lite"
+            val label = if (isLite) "FB Lite" else "Facebook"
+            val status = checkPackage(pkg, label, "https://m.facebook.com")
+            if (status.isInstalled) return status.copy(name = "FB Lite")
         }
         return SocialAppStatus(
-            id = "facebook",
-            name = "Facebook",
-            packageName = "com.facebook.katana",
+            id = "facebook_lite",
+            name = "FB Lite",
+            packageName = "com.facebook.lite",
             isInstalled = false,
             icon = null,
             webFallbackUrl = "https://m.facebook.com"
         )
     }
+
+    fun getFacebookStatus(): SocialAppStatus = getFbLiteStatus()
 
     fun getMessengerStatus(): SocialAppStatus {
         for (pkg in msgPackages) {
@@ -110,6 +115,37 @@ class ApplicationLauncher(private val context: Context) {
             DiagnosticLogger.log("LAUNCHER", "Package $packageName not installed on device", "WARN")
             AppLaunchResult.Error("Application is not installed on this device.")
         }
+    }
+
+    /**
+     * Attempts to launch an installed application in a freeform floating window
+     * using Android's ActivityOptions.setLaunchBounds (API 24+).
+     */
+    fun launchInMiniFreeformMode(packageName: String, screenWidth: Int, screenHeight: Int): Boolean {
+        val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try {
+                intent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+                )
+                val width = (screenWidth * 0.75f).toInt().coerceAtLeast(400)
+                val height = (screenHeight * 0.70f).toInt().coerceAtLeast(600)
+                val left = (screenWidth - width) / 2
+                val top = (screenHeight - height) / 2
+                val bounds = Rect(left, top, left + width, top + height)
+
+                val options = ActivityOptions.makeBasic()
+                options.launchBounds = bounds
+                context.startActivity(intent, options.toBundle())
+                DiagnosticLogger.log("LAUNCHER", "Launched $packageName with mini window bounds: $bounds")
+                return true
+            } catch (e: Exception) {
+                DiagnosticLogger.log("LAUNCHER", "Freeform bounds launch failed: ${e.message}", "WARN")
+                return false
+            }
+        }
+        return false
     }
 
     fun launchSplitScreenAdjacent(packageName: String): SplitScreenResult {

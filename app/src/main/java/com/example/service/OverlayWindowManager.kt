@@ -20,6 +20,9 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import java.net.URLEncoder
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -439,89 +442,59 @@ class OverlayWindowManager(private val context: Context) {
             weightSum = 4f
         }
 
-        val fbStatus = appLauncher.getFacebookStatus()
+        val fbLiteStatus = appLauncher.getFbLiteStatus()
         val msgStatus = appLauncher.getMessengerStatus()
         val instaStatus = appLauncher.getInstagramStatus()
 
-        // Facebook Button
+        // 1. FB Lite Button (Always opens in Mini Mode over the game)
         val fbBtn = createActionCard(
-            title = if (fbStatus.isInstalled) "Facebook" else "FB Web",
-            subtitle = if (fbStatus.isInstalled) "Launch App" else "Mini Window",
+            title = "FB Lite",
+            subtitle = "Mini Mode",
             color = Color.parseColor("#1877F2"),
             weight = 1f
         ) {
             vibrate()
-            if (fbStatus.isInstalled) {
-                appLauncher.launchPackage(fbStatus.packageName)
-                togglePanel(false)
-            } else {
-                openFloatingBrowser("https://m.facebook.com")
-            }
+            togglePanel(false)
+            openFloatingBrowser("https://m.facebook.com")
         }
         socialRow.addView(fbBtn)
 
-        // Messenger Button
+        // 2. Messenger Button (Always opens in Mini Mode over the game)
         val msgBtn = createActionCard(
-            title = if (msgStatus.isInstalled) "Messenger" else "Msg Web",
-            subtitle = if (msgStatus.isInstalled) "Launch App" else "Mini Window",
+            title = "Messenger",
+            subtitle = "Mini Mode",
             color = Color.parseColor("#0084FF"),
             weight = 1f
         ) {
             vibrate()
-            if (msgStatus.isInstalled) {
-                appLauncher.launchPackage(msgStatus.packageName)
-                togglePanel(false)
-            } else {
-                openFloatingBrowser("https://www.messenger.com")
-            }
+            togglePanel(false)
+            openFloatingBrowser("https://www.messenger.com")
         }
         socialRow.addView(msgBtn)
 
-        // Instagram Button
+        // 3. Instagram Button (Always opens in Mini Mode over the game)
         val instaBtn = createActionCard(
-            title = if (instaStatus.isInstalled) "Instagram" else "Insta Web",
-            subtitle = if (instaStatus.isInstalled) "Launch App" else "Mini Window",
+            title = "Instagram",
+            subtitle = "Mini Mode",
             color = Color.parseColor("#E1306C"),
             weight = 1f
         ) {
             vibrate()
-            if (instaStatus.isInstalled) {
-                appLauncher.launchPackage(instaStatus.packageName)
-                togglePanel(false)
-            } else {
-                openFloatingBrowser("https://www.instagram.com")
-            }
+            togglePanel(false)
+            openFloatingBrowser("https://www.instagram.com")
         }
         socialRow.addView(instaBtn)
 
-        // Split-Screen Button
+        // 4. Split / Switch to Mini Mode Button
         val splitBtn = createActionCard(
             title = "Split",
-            subtitle = "Adjacent",
+            subtitle = "Mini Mode",
             color = Color.parseColor("#B388FF"),
             weight = 1f
         ) {
             vibrate()
-            val targetPkg = when {
-                msgStatus.isInstalled -> msgStatus.packageName
-                fbStatus.isInstalled -> fbStatus.packageName
-                instaStatus.isInstalled -> instaStatus.packageName
-                else -> fbStatus.packageName
-            }
-            val result = appLauncher.launchSplitScreenAdjacent(targetPkg)
-            when (result) {
-                is SplitScreenResult.LaunchedAdjacent -> {
-                    Toast.makeText(context, "Launched in adjacent window", Toast.LENGTH_SHORT).show()
-                    togglePanel(false)
-                }
-                is SplitScreenResult.FallbackToFloating -> {
-                    Toast.makeText(context, "Split rejected by OS. Opening Floating Mini-Browser...", Toast.LENGTH_SHORT).show()
-                    openFloatingBrowser("https://m.facebook.com")
-                }
-                is SplitScreenResult.NotSupported -> {
-                    Toast.makeText(context, result.reason, Toast.LENGTH_SHORT).show()
-                }
-            }
+            togglePanel(false)
+            openFloatingBrowser("https://www.google.com")
         }
         socialRow.addView(splitBtn)
         rootCard.addView(socialRow)
@@ -545,10 +518,11 @@ class OverlayWindowManager(private val context: Context) {
             orientation = LinearLayout.HORIZONTAL
         }
 
-        // Floating Mini-Browser Tool
+        // Floating Mini-Browser Tool (Opens real general web browser, not hardcoded to FB)
         toolsRow.addView(createToolChip("Mini-Browser", android.R.drawable.ic_menu_view) {
             vibrate()
-            openFloatingBrowser("https://m.facebook.com")
+            togglePanel(false)
+            openFloatingBrowser("https://www.google.com")
         })
 
         // Floating Notes Tool
@@ -855,7 +829,7 @@ class OverlayWindowManager(private val context: Context) {
         }
 
         val title = TextView(context).apply {
-            text = "NEXUS META BROWSER"
+            text = "NEXUS MINI-BROWSER"
             textSize = 12f
             setTextColor(currentConfig.accentColorHex.toInt())
             setTypeface(null, android.graphics.Typeface.BOLD)
@@ -894,10 +868,18 @@ class OverlayWindowManager(private val context: Context) {
                         if (status.isInstalled) appLauncher.launchPackage(status.packageName)
                         else Toast.makeText(context, "Messenger app is not installed", Toast.LENGTH_SHORT).show()
                     }
-                    else -> {
-                        val status = appLauncher.getFacebookStatus()
+                    currentActiveUrl.contains("facebook") || currentActiveUrl.contains("fb.com") -> {
+                        val status = appLauncher.getFbLiteStatus()
                         if (status.isInstalled) appLauncher.launchPackage(status.packageName)
-                        else Toast.makeText(context, "Facebook app is not installed", Toast.LENGTH_SHORT).show()
+                        else Toast.makeText(context, "FB Lite is not installed", Toast.LENGTH_SHORT).show()
+                    }
+                    else -> {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(currentActiveUrl)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {}
                     }
                 }
             }
@@ -936,11 +918,106 @@ class OverlayWindowManager(private val context: Context) {
         titleBar.addView(closeBtn)
         container.addView(titleBar)
 
-        // Meta Quick-Switch Tabs Bar (Facebook, Messenger, Instagram)
+        // 1. General Address & Search Bar
+        val searchBar = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.parseColor("#141D2C"))
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+        }
+
+        // Home button (Google Search)
+        val homeBtn = ImageView(context).apply {
+            setImageResource(android.R.drawable.ic_menu_today)
+            setColorFilter(Color.parseColor("#8E9EB8"))
+            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { marginEnd = dp(6) }
+            setOnClickListener {
+                vibrate()
+                currentActiveUrl = "https://www.google.com"
+                webViewRef?.loadUrl("https://www.google.com")
+            }
+        }
+        searchBar.addView(homeBtn)
+
+        var urlInputRef: EditText? = null
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+
+        val urlInput = EditText(context).apply {
+            hint = "Search Google or type URL..."
+            setText(if (initialUrl.contains("google.com")) "" else initialUrl)
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#55657E"))
+            val inputBg = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(6).toFloat()
+                setColor(Color.parseColor("#090D14"))
+                setStroke(dp(1), Color.parseColor("#22304A"))
+            }
+            background = inputBg
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            isSingleLine = true
+            imeOptions = EditorInfo.IME_ACTION_GO
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(6)
+            }
+        }
+        urlInputRef = urlInput
+        searchBar.addView(urlInput)
+
+        fun executeNavigation(raw: String) {
+            val input = raw.trim()
+            if (input.isEmpty()) return
+            val target = when {
+                input.startsWith("http://") || input.startsWith("https://") -> input
+                input.contains(".") && !input.contains(" ") -> "https://$input"
+                else -> "https://www.google.com/search?q=" + URLEncoder.encode(input, "UTF-8")
+            }
+            currentActiveUrl = target
+            urlInput.setText(target)
+            webViewRef?.loadUrl(target)
+            imm?.hideSoftInputFromWindow(urlInput.windowToken, 0)
+            urlInput.clearFocus()
+        }
+
+        val goBtn = TextView(context).apply {
+            text = "GO"
+            textSize = 10f
+            setTextColor(Color.WHITE)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            val btnBg = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(6).toFloat()
+                setColor(currentConfig.accentColorHex.toInt())
+            }
+            background = btnBg
+            setPadding(dp(10), dp(4), dp(10), dp(4))
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            setOnClickListener {
+                vibrate()
+                executeNavigation(urlInput.text.toString())
+            }
+        }
+        searchBar.addView(goBtn)
+
+        urlInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_GO || actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
+                vibrate()
+                executeNavigation(urlInput.text.toString())
+                true
+            } else false
+        }
+        container.addView(searchBar)
+
+        // 2. Quick Bookmarks Bar (Google, FB Lite, Messenger, Instagram, YouTube)
+        val bookmarksScroll = HorizontalScrollView(context).apply {
+            isHorizontalScrollBarEnabled = false
+            setBackgroundColor(Color.parseColor("#0F1623"))
+            setPadding(dp(6), dp(3), dp(6), dp(3))
+        }
+
         val tabsBar = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#121927"))
-            setPadding(dp(8), dp(4), dp(8), dp(4))
             gravity = Gravity.CENTER_VERTICAL
         }
 
@@ -953,29 +1030,32 @@ class OverlayWindowManager(private val context: Context) {
                 val bg = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
                     cornerRadius = dp(6).toFloat()
-                    setColor(Color.parseColor("#22304A"))
+                    setColor(Color.parseColor("#1C2638"))
                     setStroke(dp(1), Color.parseColor(colorHex))
                 }
                 background = bg
-                setPadding(dp(8), dp(4), dp(8), dp(4))
-                val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                setPadding(dp(8), dp(3), dp(8), dp(3))
+                val lp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                     setMargins(dp(3), 0, dp(3), 0)
                 }
                 layoutParams = lp
-                gravity = Gravity.CENTER
                 setOnClickListener {
                     vibrate()
                     currentActiveUrl = targetUrl
+                    urlInputRef?.setText(targetUrl)
                     CookieManager.getInstance().flush()
                     webViewRef?.loadUrl(targetUrl)
                 }
             }
         }
 
-        tabsBar.addView(createMetaTab("Facebook", "#1877F2", "https://m.facebook.com"))
+        tabsBar.addView(createMetaTab("Google", "#00E5FF", "https://www.google.com"))
+        tabsBar.addView(createMetaTab("FB Lite", "#1877F2", "https://m.facebook.com"))
         tabsBar.addView(createMetaTab("Messenger", "#0084FF", "https://www.messenger.com"))
         tabsBar.addView(createMetaTab("Instagram", "#E1306C", "https://www.instagram.com"))
-        container.addView(tabsBar)
+        tabsBar.addView(createMetaTab("YouTube", "#FF0000", "https://m.youtube.com"))
+        bookmarksScroll.addView(tabsBar)
+        container.addView(bookmarksScroll)
 
         // Drag listener on Title Bar
         var initX = 0

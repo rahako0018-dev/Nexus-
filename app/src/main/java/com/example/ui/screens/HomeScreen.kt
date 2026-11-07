@@ -402,7 +402,7 @@ fun HomeScreen(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
-                val fbStatus = appLauncher.getFacebookStatus()
+                val fbLiteStatus = appLauncher.getFbLiteStatus()
                 val msgStatus = appLauncher.getMessengerStatus()
                 val instaStatus = appLauncher.getInstagramStatus()
 
@@ -410,7 +410,7 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Facebook Card
+                    // FB Lite Card
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -418,26 +418,24 @@ fun HomeScreen(
                             .background(NexusDarkBg)
                             .border(BorderStroke(1.dp, Color(0xFF1877F2)), RoundedCornerShape(12.dp))
                             .clickable {
-                                if (fbStatus.isInstalled) {
-                                    appLauncher.launchPackage(fbStatus.packageName)
+                                if (permissionManager.hasOverlayPermission()) {
+                                    OverlayService.startService(context)
+                                    Toast.makeText(context, "Opening FB Lite in Mini Mode", Toast.LENGTH_SHORT).show()
                                 } else {
-                                    Toast.makeText(context, "Opening Facebook in Floating Browser", Toast.LENGTH_SHORT).show()
-                                    if (permissionManager.hasOverlayPermission()) {
-                                        OverlayService.startService(context)
-                                    }
+                                    context.startActivity(permissionManager.createOverlaySettingsIntent())
                                 }
                             }
                             .padding(10.dp)
                     ) {
                         Column {
                             Text(
-                                text = "Facebook",
+                                text = "FB Lite",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
                             )
                             Text(
-                                text = if (fbStatus.isInstalled) "Installed App" else "Web Version",
+                                text = if (fbLiteStatus.isInstalled) "Mini Mode (App)" else "Mini Web",
                                 fontSize = 10.sp,
                                 color = Color(0xFF1877F2)
                             )
